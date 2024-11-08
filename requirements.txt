@@ -1,8 +1,10 @@
 Flask
+Flask-Cors
 scipy
 imutils
 numpy
-opencv-python-headless
+dlib
+opencv-python
 wget
-flask-cors
-https://github.com/ageitgey/face_recognition_models/releases/download/v0.3.0/dlib-19.22.0-cp39-cp39-manylinux2014_x86_64.whl
+dlib  # or another compatible version
+cmake          # CMake is required for building dlib

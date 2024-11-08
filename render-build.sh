@@ -1,6 +1,8 @@
 #!/bin/bash
-# Update the package list and install build dependencies
-apt-get update && apt-get install -y cmake g++ wget unzip
+# Update the package list and install necessary system dependencies
+apt-get update && apt-get install -y cmake g++ wget
 
-# Run the default Render build command (install requirements)
+# Install Python dependencies listed in requirements.txt
 pip install -r requirements.txt
+
+
