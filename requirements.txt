@@ -6,3 +6,5 @@ numpy==1.26.0
 dlib==19.24.0
 opencv-python==4.8.1.78
 wget==3.2
+dlib==19.22.0  # or another compatible version
+cmake          # CMake is required for building dlib
