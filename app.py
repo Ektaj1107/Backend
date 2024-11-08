@@ -108,5 +108,5 @@ def get_blink_count():
         print(f"Error: {str(e)}")
         return jsonify({'error': 'Internal Server Error'}), 500
 
-if __name__ == '__main__':  # Corrected this line
-    app.run(debug=True)
+# if __name__ == '__main__':  # Corrected this line
+#     app.run(debug=True)
