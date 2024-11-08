@@ -1,11 +1,9 @@
 from flask import Flask, jsonify, Response
 from scipy.spatial import distance as dist
-from imutils import face_utils
 import numpy as np
-import dlib
+import mediapipe as mp
 import cv2
 import os
-import wget
 import time
 from flask_cors import CORS
 
@@ -18,17 +16,9 @@ EYE_AR_THRESH = 0.3
 EYE_AR_CONSEC_FRAMES = 2
 COUNTER = 0
 
-# Define path for dlib model
-MODEL_PATH = 'model/shape_predictor_68_face_landmarks.dat'
-
-# Download the model if not present
-if not os.path.exists(MODEL_PATH):
-    wget.download('http://dlib.net/files/shape_predictor_68_face_landmarks.dat.bz2', out='model/')
-    # Unzip the file
-    import bz2
-    with bz2.BZ2File('model/shape_predictor_68_face_landmarks.dat.bz2') as fr, open(MODEL_PATH, 'wb') as fw:
-        fw.write(fr.read())
-    os.remove('model/shape_predictor_68_face_landmarks.dat.bz2')
+# Initialize Mediapipe Face Mesh
+mp_face_mesh = mp.solutions.face_mesh
+face_mesh = mp_face_mesh.FaceMesh(static_image_mode=False, max_num_faces=1, min_detection_confidence=0.5)
 
 # Eye Aspect Ratio calculation
 def eye_aspect_ratio(eye):
@@ -42,14 +32,9 @@ def eye_aspect_ratio(eye):
 @app.route('/detect_blinks')
 def detect_blinks():
     global TOTAL_BLINKS, COUNTER
-    detector = dlib.get_frontal_face_detector()
-    predictor = dlib.shape_predictor(MODEL_PATH)
-
-    (lStart, lEnd) = face_utils.FACIAL_LANDMARKS_IDXS["left_eye"]
-    (rStart, rEnd) = face_utils.FACIAL_LANDMARKS_IDXS["right_eye"]
 
     def generate_frames():
-        global TOTAL_BLINKS, COUNTER  # Declare global variables inside the function
+        global TOTAL_BLINKS, COUNTER
         cap = cv2.VideoCapture(0)
         start_time = time.time()
 
@@ -58,26 +43,30 @@ def detect_blinks():
             if not ret:
                 break
 
-            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-            rects = detector(gray, 0)
+            rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            results = face_mesh.process(rgb_frame)
 
-            for rect in rects:
-                shape = predictor(gray, rect)
-                shape = face_utils.shape_to_np(shape)
+            if results.multi_face_landmarks:
+                for face_landmarks in results.multi_face_landmarks:
+                    left_eye = [(face_landmarks.landmark[i].x, face_landmarks.landmark[i].y) for i in [362, 385, 387, 263, 373, 380]]
+                    right_eye = [(face_landmarks.landmark[i].x, face_landmarks.landmark[i].y) for i in [33, 160, 158, 133, 153, 144]]
 
-                leftEye = shape[lStart:lEnd]
-                rightEye = shape[rStart:rEnd]
-                leftEAR = eye_aspect_ratio(leftEye)
-                rightEAR = eye_aspect_ratio(rightEye)
+                    # Convert normalized coordinates to actual pixel coordinates
+                    h, w, _ = frame.shape
+                    left_eye = [(int(x * w), int(y * h)) for x, y in left_eye]
+                    right_eye = [(int(x * w), int(y * h)) for x, y in right_eye]
 
-                ear = (leftEAR + rightEAR) / 2.0
+                    leftEAR = eye_aspect_ratio(left_eye)
+                    rightEAR = eye_aspect_ratio(right_eye)
 
-                if ear < EYE_AR_THRESH:
-                    COUNTER += 1
-                else:
-                    if COUNTER >= EYE_AR_CONSEC_FRAMES:
-                        TOTAL_BLINKS += 1
-                    COUNTER = 0
+                    ear = (leftEAR + rightEAR) / 2.0
+
+                    if ear < EYE_AR_THRESH:
+                        COUNTER += 1
+                    else:
+                        if COUNTER >= EYE_AR_CONSEC_FRAMES:
+                            TOTAL_BLINKS += 1
+                        COUNTER = 0
 
             elapsed_time = time.time() - start_time
 
@@ -108,5 +97,5 @@ def get_blink_count():
         print(f"Error: {str(e)}")
         return jsonify({'error': 'Internal Server Error'}), 500
 
-# if __name__ == '__main__':  # Corrected this line
-#     app.run(debug=True)
+if __name__ == '__main__':
+    app.run(debug=True)
